@@ -569,7 +569,7 @@ function vAd() {
   admTarget = T.id;
   const keys = [...Object.keys(RES), 'kb', 'troops'];
   return `<div class="card"><h3>👑 Panel admin</h3>
-    <div class="mu">KB del admin (5% del mercado): <b>${kb(S.admin_kb)}</b></div></div>
+    <div class="mu">KB del admin (5% del mercado): <b>${kb(S.admin_kb)}</b>${S.admin_kb > 0 ? ' <button class="s" onclick="claimAdminKb()">Cobrar</button>' : ''}</div></div>
 
   <div class="card"><h3>Cuenta objetivo</h3>
     <select onchange="admTarget=this.value;render(true)">${S.players.map(p => `<option value="${p.id}" ${p.id === T.id ? 'selected' : ''}>${esc(p.name)}${p.admin ? ' 👑' : ''}</option>`).join('')}</select>
@@ -649,6 +649,7 @@ function adminGive(sign) {
 }
 function adminToggleRegion(ri) { rpc('admin_toggle_region', { p_region: ri }, 'Región actualizada'); }
 function adminSetAdmin(id, val) { rpc('admin_set_admin', { p_player: id, p_value: val }, 'Permisos actualizados'); }
+function claimAdminKb() { rpc('admin_claim_kb', null, 'KB del mercado cobrados'); }
 
 /* ------------------------- ciclo de vida ------------------------- */
 
