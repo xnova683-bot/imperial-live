@@ -31,6 +31,7 @@ const RT_TABLES = ['event_log','offers','alliances','alliance_members','fort_gar
 
 let S = null;
 let tab = 'mapa';
+let menuOpen = false;
 let selR = 0;
 let mapZoom = 1;
 let mapFocusPending = true;
@@ -71,8 +72,10 @@ function toast(msg, type = 'ok') {
 
 function showLogin(msg = '') {
   S = null;
+  menuOpen = false;
   document.body.classList.add('auth');
   $('nav').style.display = 'none';
+  $('nav').classList.remove('open');
   $('top').innerHTML = '';
   $('marches').innerHTML = '';
   $('m').innerHTML = `
@@ -162,7 +165,9 @@ async function submitAuth() {
 
 async function enterGame() {
   document.body.classList.remove('auth');
-  $('nav').style.display = 'flex';
+  menuOpen = false;
+  $('nav').style.display = '';
+  $('nav').classList.remove('open');
   mapFocusPending = true;
   selR = 0;
   admTarget = null;
@@ -239,8 +244,9 @@ function render(force) {
     ['cuenta','🔑','Cuenta'], ['registro','📜','Registro']
   ];
   $('nav').innerHTML = tabs.map(t =>
-    `<button class="${tab === t[0] ? 'on' : ''}" onclick="gotoTab('${t[0]}')">${t[1]}<br>${t[2]}</button>`
+    `<button class="${tab === t[0] ? 'on' : ''}" onclick="gotoTab('${t[0]}')"><span class="ni">${t[1]}</span><span>${t[2]}</span></button>`
   ).join('');
+  $('nav').classList.toggle('open', menuOpen);
 
   const active = document.activeElement;
   const typing = active && ['INPUT','SELECT','TEXTAREA'].includes(active.tagName);
@@ -274,13 +280,32 @@ function render(force) {
 function gotoTab(t) {
   if (t === 'mapa' && tab !== 'mapa') mapFocusPending = true;
   tab = t;
+  menuOpen = false;
   render(true);
+}
+
+function setMenu(open) {
+  menuOpen = !!open;
+  const nav = $('nav');
+  if (nav) nav.classList.toggle('open', menuOpen);
+  const btn = document.querySelector('.menu-btn');
+  if (btn) {
+    btn.classList.toggle('on', menuOpen);
+    btn.textContent = menuOpen ? '✕' : '☰';
+    btn.setAttribute('aria-expanded', String(menuOpen));
+  }
+}
+
+function toggleMenu(e) {
+  if (e) e.stopPropagation();
+  setMenu(!menuOpen);
 }
 
 function drawTop() {
   if (!S) { $('top').innerHTML = ''; return; }
   const r = estRes();
   $('top').innerHTML =
+    `<button class="menu-btn ${menuOpen ? 'on' : ''}" onclick="toggleMenu(event)" aria-label="Abrir menú" aria-expanded="${menuOpen}">${menuOpen ? '✕' : '☰'}</button>` +
     `<span>${RACES[S.me.race].e} ${esc(S.me.name)}${S.me.is_admin ? ' 👑' : ''}</span>` +
     `<span>🪙 KB <b>${kb(S.me.kb)}</b></span>` +
     Object.entries(RES).map(([k, v]) => `<span>${v[0]}<b>${fmt(r[k])}</b></span>`).join('') +
@@ -746,5 +771,14 @@ async function boot() {
     }
   });
 }
+
+document.addEventListener('click', (e) => {
+  if (!menuOpen) return;
+  if (e.target.closest('#nav') || e.target.closest('.menu-btn')) return;
+  setMenu(false);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && menuOpen) setMenu(false);
+});
 
 boot();
