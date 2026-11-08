@@ -354,6 +354,15 @@ function mapRoads() {
       d += `M${x} ${y} Q${x + 2} ${(y + y2) / 2} ${x} ${y2} `;
     }
   }
+  // Caminos desde cada ciudad real hasta la fortaleza de su región.
+  (S.players || []).forEach(p => {
+    const c = cityPos(p), f = regionCenter(p.region_id || 0);
+    const dx = f.x - c.x, dy = f.y - c.y, len = Math.hypot(dx, dy) || 1;
+    const bend = Math.min(0.6, len * 0.03) * ((Math.round(c.x + c.y) % 2) ? 1 : -1);
+    const mx = (c.x + f.x) / 2 - (dy / len) * bend;
+    const my = (c.y + f.y) / 2 + (dx / len) * bend;
+    d += `M${c.x} ${c.y} Q${mx} ${my} ${f.x} ${f.y} `;
+  });
   return `<svg class="map-roads" viewBox="0 0 100 100" preserveAspectRatio="none"><g class="road-shadow"><path d="${d}"/></g><g class="road-line"><path d="${d}"/></g></svg>`;
 }
 
@@ -419,7 +428,7 @@ function vMapa() {
   <div class="map-viewport" id="mapViewport">
     <div class="wm" id="mapWorld" style="width:${500 * mapZoom}%;height:${500 * mapZoom}%;background-image:url(assets/map.webp)">
       ${mapRoads()}
-      ${S.regions.map(regionCell).join('')}
+      <div class="wg">${S.regions.map(regionCell).join('')}</div>
       ${S.regions.map(fortMarker).join('')}
       ${S.players.map(cityDot).join('')}
       ${attackMarkers()}
