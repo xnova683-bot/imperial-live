@@ -235,7 +235,8 @@ function render(force) {
   drawTop();
   const tabs = [
     ['mapa','🗺️','Mapa'], ['ejercito','🪖','Ejército'], ['alianza','🤝','Alianza'],
-    ['mercado','🏪','Mercado'], ...(S.me.is_admin ? [['admin','👑','Admin']] : []), ['registro','📜','Registro']
+    ['mercado','🏪','Mercado'], ...(S.me.is_admin ? [['admin','👑','Admin']] : []),
+    ['cuenta','🔑','Cuenta'], ['registro','📜','Registro']
   ];
   $('nav').innerHTML = tabs.map(t =>
     `<button class="${tab === t[0] ? 'on' : ''}" onclick="gotoTab('${t[0]}')">${t[1]}<br>${t[2]}</button>`
@@ -243,7 +244,7 @@ function render(force) {
 
   const active = document.activeElement;
   const typing = active && ['INPUT','SELECT','TEXTAREA'].includes(active.tagName);
-  if (!force && typing && ['mercado','alianza','admin'].includes(tab)) return;
+  if (!force && typing && ['mercado','alianza','admin','cuenta'].includes(tab)) return;
 
   const vp = $('mapViewport');
   const mapPos = vp ? { x: vp.scrollLeft, y: vp.scrollTop } : null;
@@ -316,6 +317,7 @@ function view() {
     case 'alianza': return vAl();
     case 'mercado': return vMe();
     case 'admin': return vAd();
+    case 'cuenta': return vCuenta();
     case 'registro': return vLog();
     default: return vMapa();
   }
@@ -597,6 +599,29 @@ function vAd() {
   </div>`;
 }
 
+/* ------------------------- cuenta ------------------------- */
+
+function vCuenta() {
+  const r = RACES[S.me.race] || RACES.alianza;
+  return `<div class="card"><h3>👤 Mi cuenta</h3>
+    <div class="row"><span>Usuario</span><b>${esc(S.me.name)}${S.me.is_admin ? ' 👑' : ''}</b></div>
+    <div class="row"><span>Raza</span><span>${r.e} ${r.n}</span></div>
+    <div class="row"><span>Región</span><span>${esc((S.regions.find(x => x.id === S.me.region_id) || {}).name || '—')}</span></div>
+    <p class="mu small">La contraseña se guarda cifrada en Supabase. Nadie puede verla, ni siquiera el administrador.</p>
+  </div>
+
+  <div class="card"><h3>🔑 Cambiar contraseña</h3>
+    <label for="pw0">Contraseña actual</label>
+    <input id="pw0" type="password" autocomplete="current-password" placeholder="Tu contraseña actual">
+    <label for="pw1">Nueva contraseña</label>
+    <input id="pw1" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres">
+    <label for="pw2">Repite la nueva contraseña</label>
+    <input id="pw2" type="password" autocomplete="new-password" placeholder="Repite la nueva">
+    <button class="wide" onclick="changePassword()">Actualizar contraseña</button>
+    <p class="mu small">Si no recuerdas la contraseña actual, pide al administrador que te genere una temporal.</p>
+  </div>`;
+}
+
 /* ------------------------- registro ------------------------- */
 
 function vLog() {
@@ -659,6 +684,29 @@ function adminGive(sign) {
 function adminToggleRegion(ri) { rpc('admin_toggle_region', { p_region: ri }, 'Región actualizada'); }
 function adminSetAdmin(id, val) { rpc('admin_set_admin', { p_player: id, p_value: val }, 'Permisos actualizados'); }
 function claimAdminKb() { rpc('admin_claim_kb', null, 'KB del mercado cobrados'); }
+
+async function changePassword() {
+  const cur = ($('pw0') && $('pw0').value) || '';
+  const npw = ($('pw1') && $('pw1').value) || '';
+  const npw2 = ($('pw2') && $('pw2').value) || '';
+  if (!cur) return toast('Escribe tu contraseña actual', 'bad');
+  if (npw.length < 6) return toast('La nueva contraseña debe tener al menos 6 caracteres', 'bad');
+  if (npw !== npw2) return toast('Las contraseñas nuevas no coinciden', 'bad');
+  if (cur === npw) return toast('La nueva contraseña debe ser distinta a la actual', 'bad');
+  const email = S.me.name.toLowerCase() + '@imperial.local';
+  try {
+    const { error: loginError } = await sb.auth.signInWithPassword({ email, password: cur });
+    if (loginError) throw new Error('La contraseña actual no es correcta');
+    const { error } = await sb.auth.updateUser({ password: npw });
+    if (error) throw new Error(error.message || 'No se pudo actualizar la contraseña');
+    $('pw0').value = '';
+    $('pw1').value = '';
+    $('pw2').value = '';
+    toast('Contraseña actualizada correctamente');
+  } catch (e) {
+    toast(e.message || 'Error al cambiar la contraseña', 'bad');
+  }
+}
 
 /* ------------------------- ciclo de vida ------------------------- */
 
