@@ -93,3 +93,11 @@ body.auth main{padding:0;max-width:none;display:grid;place-items:center;min-heig
   .rank-head.ally,.rank-row.ally{grid-template-columns:24px minmax(0,1fr) 46px 40px 56px}
   .rank-head{font-size:9px}
 }
+
+/* ------------------------- Entrenamiento por niveles ------------------------- */
+.train-row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid rgba(184,203,225,.08)}
+.train-row:last-child{border-bottom:0}
+.train-row.locked{opacity:.55}
+.train-actions{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.train-actions button{min-width:0;padding:6px 7px;font-size:11px}
+.army-summary{margin-top:8px;padding-top:8px;border-top:1px solid rgba(184,203,225,.1);font-size:13px}
