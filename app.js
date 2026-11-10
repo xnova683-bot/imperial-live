@@ -239,8 +239,9 @@ function render(force) {
   if (tab === 'admin' && !S.me.is_admin) tab = 'mapa';
   drawTop();
   const tabs = [
-    ['mapa','🗺️','Mapa'], ['ejercito','🪖','Ejército'], ['alianza','🤝','Alianza'],
-    ['mercado','🏪','Mercado'], ...(S.me.is_admin ? [['admin','👑','Admin']] : []),
+    ['mapa','🗺️','Mapa'], ['ranking','🏆','Ranking'], ['ejercito','🪖','Ejército'],
+    ['alianza','🤝','Alianza'], ['mercado','🏪','Mercado'],
+    ...(S.me.is_admin ? [['admin','👑','Admin']] : []),
     ['cuenta','🔑','Cuenta'], ['registro','📜','Registro']
   ];
   $('nav').innerHTML = tabs.map(t =>
@@ -308,6 +309,7 @@ function drawTop() {
     `<button class="menu-btn ${menuOpen ? 'on' : ''}" onclick="toggleMenu(event)" aria-label="Abrir menú" aria-expanded="${menuOpen}">${menuOpen ? '✕' : '☰'}</button>` +
     `<span>${RACES[S.me.race].e} ${esc(S.me.name)}${S.me.is_admin ? ' 👑' : ''}</span>` +
     `<span>🪙 KB <b>${kb(S.me.kb)}</b></span>` +
+    `<span title="Puntos de ranking">🏅<b>${fmt(S.me.points || 0)}</b></span>` +
     Object.entries(RES).map(([k, v]) => `<span>${v[0]}<b>${fmt(r[k])}</b></span>`).join('') +
     `<span>🪖<b>${S.me.troops}</b></span>` +
     `<button class="s" onclick="logout()">Salir</button>`;
@@ -338,6 +340,7 @@ function updateTimers() {
 
 function view() {
   switch (tab) {
+    case 'ranking': return vRanking();
     case 'ejercito': return vEj();
     case 'alianza': return vAl();
     case 'mercado': return vMe();
@@ -502,6 +505,70 @@ function fortCard(r) {
     else h += `<span class="mu"> Necesitas una alianza para atacar.</span>`;
   }
   return h + '</div>';
+}
+
+/* ------------------------- ranking ------------------------- */
+
+function rankMedal(n) {
+  return n === 1 ? '🥇' : n === 2 ? '🥈' : n === 3 ? '🥉' : String(n);
+}
+
+function vRanking() {
+  const players = [...(S.players || [])].sort((a, b) =>
+    (Number(b.points) || 0) - (Number(a.points) || 0) ||
+    (Number(b.kb) || 0) - (Number(a.kb) || 0) ||
+    String(a.name).localeCompare(String(b.name))
+  );
+  const myPos = players.findIndex(p => p.id === S.me.id) + 1;
+
+  const groups = {};
+  players.forEach(p => {
+    if (!p.ally_id) return;
+    const key = String(p.ally_id);
+    if (!groups[key]) groups[key] = { id: p.ally_id, name: p.ally || 'Alianza', points: 0, members: 0, forts: 0 };
+    const g = groups[key];
+    g.points += Number(p.points) || 0;
+    g.members++;
+    if (p.ally) g.name = p.ally;
+  });
+  Object.values(groups).forEach(g => {
+    g.forts = (S.regions || []).filter(r => r.fort && String(r.fort.owner) === String(g.id)).length;
+  });
+  const allys = Object.values(groups).sort((a, b) =>
+    b.points - a.points || b.forts - a.forts || a.name.localeCompare(b.name)
+  );
+  const myAlly = S.me.ally_id ? allys.find(a => String(a.id) === String(S.me.ally_id)) : null;
+  const myAllyPos = myAlly ? allys.indexOf(myAlly) + 1 : 0;
+
+  return `<div class="card"><h3>🏆 Tu posición</h3>
+    <div class="row"><span>Jugador</span><b>#${myPos || '—'} de ${players.length} · ${fmt(S.me.points || 0)} pts</b></div>
+    ${S.me.ally_id
+      ? `<div class="row"><span>Alianza</span><b>${myAlly ? '#' + myAllyPos + ' de ' + allys.length : '—'} · ${myAlly ? fmt(myAlly.points) : 0} pts</b></div>`
+      : '<div class="row"><span>Alianza</span><span class="mu">Sin alianza</span></div>'}
+    <p class="mu small">Puntos = KB + tropas + 10 por nivel de edificio + tropas en fortalezas.</p>
+  </div>
+
+  <div class="card"><h3>🏆 Ranking de jugadores</h3>
+    <div class="rank-head"><span>#</span><span>Jugador</span><span>Alianza</span><span>Puntos</span></div>
+    ${players.map((p, i) => `<div class="rank-row ${p.id === S.me.id ? 'me' : ''}">
+      <span class="rank-pos">${rankMedal(i + 1)}</span>
+      <span class="rank-name">${(RACES[p.race] || RACES.alianza).e} ${esc(p.name)}${p.admin ? ' 👑' : ''}</span>
+      <span class="rank-ally">${p.ally ? esc(p.ally) : '—'}</span>
+      <span class="rank-pts"><b>${fmt(p.points || 0)}</b></span>
+    </div>`).join('') || '<p class="mu">Sin jugadores.</p>'}
+  </div>
+
+  <div class="card"><h3>🛡️ Ranking de alianzas</h3>
+    <p class="mu">Se mide por la suma de los puntos de sus miembros.</p>
+    <div class="rank-head ally"><span>#</span><span>Alianza</span><span>Miembros</span><span>Fort.</span><span>Puntos</span></div>
+    ${allys.map((a, i) => `<div class="rank-row ally ${S.me.ally_id && String(a.id) === String(S.me.ally_id) ? 'me' : ''}">
+      <span class="rank-pos">${rankMedal(i + 1)}</span>
+      <span class="rank-name">🛡️ ${esc(a.name)}</span>
+      <span class="rank-mid rank-members">${a.members}/5</span>
+      <span class="rank-mid rank-forts">🏰 ${a.forts}</span>
+      <span class="rank-pts"><b>${fmt(a.points)}</b></span>
+    </div>`).join('') || '<p class="mu">Todavía no hay alianzas.</p>'}
+  </div>`;
 }
 
 /* ------------------------- ejército ------------------------- */
