@@ -22,8 +22,14 @@ const BLD = {
 };
 const EFF = {
   granja:'+15% comida/nv', aserradero:'+15% madera/nv', cantera:'+15% piedra/nv',
-  mina:'+15% oro/nv', cuartel:'−5% coste tropas/nv', muralla:'+5% defensa guarnición/nv'
+  mina:'+15% oro/nv', cuartel:'−5% coste/nv · desbloquea tropas', muralla:'+5% defensa guarnición/nv'
 };
+const TIERS = [
+  { k:'t1', lvl:1,  p:1,    cf:5,  cg:3,  e:'🗡️', n:{horda:'Saqueadores',alianza:'Milicia',enanos:'Mineros'} },
+  { k:'t2', lvl:4,  p:2.6,  cf:11, cg:7,  e:'⚔️', n:{horda:'Jinetes',alianza:'Soldados',enanos:'Ballesteros'} },
+  { k:'t3', lvl:7,  p:6.5,  cf:24, cg:15, e:'🛡️', n:{horda:'Berserkers',alianza:'Caballeros',enanos:'Guardianes'} },
+  { k:'t4', lvl:10, p:16,   cf:52, cg:33, e:'👑', n:{horda:'Señores de la Guerra',alianza:'Guardia Real',enanos:'Martilladores'} }
+];
 const IC = { atk:'⚔️', car:'🚚', ref:'🛡️', ret:'↩️' };
 const RT_TABLES = ['event_log','offers','alliances','alliance_members','fort_garrison','marches'];
 
@@ -40,7 +46,7 @@ let authMode = 'login';
 
 let stateAt = 0;
 let serverSkew = 0;
-let refreshing = false;
+let refreshPromise = null;
 let refreshTimer = null;
 let resolving = false;
 let pollCounter = 0;
@@ -56,6 +62,9 @@ function esc(s) {
 }
 function fmt(n) { return Math.floor(Number(n) || 0).toLocaleString('es-ES'); }
 function kb(n) { return (Number(n) || 0).toFixed(1); }
+function tierName(t) { return t.n[S?.me?.race] || t.n.alianza; }
+function armyTotal(a) { return TIERS.reduce((x, t) => x + (Number(a?.[t.k]) || 0), 0); }
+function armyPower(a) { return TIERS.reduce((x, t) => x + (Number(a?.[t.k]) || 0) * t.p, 0); }
 function srvNow() { return Date.now() + serverSkew; }
 function remaining(iso) { return Math.max(0, Math.ceil((new Date(iso).getTime() - srvNow()) / 1000)); }
 
@@ -196,22 +205,24 @@ async function rpc(fn, args, okMsg) {
   }
 }
 
-async function refresh() {
-  if (refreshing) return;
-  refreshing = true;
-  try {
-    const { data, error } = await sb.rpc('get_state');
-    if (error) throw new Error(error.message || 'Error');
-    S = data;
-    stateAt = Date.now();
-    serverSkew = new Date(S.server_now).getTime() - Date.now();
-    render();
-  } catch (e) {
-    console.error(e);
-    if (/No autenticado|JWT/i.test(String(e.message))) showLogin();
-  } finally {
-    refreshing = false;
-  }
+function refresh() {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const { data, error } = await sb.rpc('get_state');
+      if (error) throw new Error(error.message || 'Error');
+      S = data;
+      stateAt = Date.now();
+      serverSkew = new Date(S.server_now).getTime() - Date.now();
+      render();
+    } catch (e) {
+      console.error(e);
+      if (/No autenticado|JWT/i.test(String(e.message))) showLogin();
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
 }
 
 function refreshSoon(ms = 500) {
@@ -488,13 +499,14 @@ function fortCard(r) {
   const gl = f.gar_list || [];
   let h = `<div class="card"><h3>🏰 Fortaleza central</h3>
     <div class="mu">Dueño: ${f.owner_name ? esc(f.owner_name) : 'Sin dueño (NPC 🪖' + f.npc + ')'}</div>
-    <div>🛡️ Guarnición: ${gl.map(g => `${esc(g.name)} ${g.troops}`).join(' · ') || 'vacía'}</div>`;
+    <div>🛡️ Guarnición: ${gl.map(g => `${esc(g.name)} ${g.troops}${g.army ? ` · ⚔️${fmt(armyPower(g.army))}` : ''}`).join(' · ') || 'vacía'}</div>`;
 
   if (f.owner && S.me.ally_id === f.owner) {
     h += `<div class="mu" style="margin-top:6px">Reserva: ${Object.entries(RES).map(([k, v]) => v[0] + ' ' + fmt(f.store[k] || 0)).join(' ')} · 🪙 ${kb(f.store.kb || 0)} KB</div>
       <div class="mu">Producción automática: +0.5 de cada recurso por segundo. Los KB se acumulan con el 15% de las ventas del mercado.</div>
       <button onclick="caravan(${r.id})">${IC.car} Enviar caravana a mi ciudad</button><hr>
-      ${(S.ally.members || []).map(m => `<div class="row"><span>${esc(m.name)}${m.leader ? ' 👑' : ''} · guarnición ${(f.gar && f.gar[m.name]) || 0}</span><span>${m.id === S.me.id ? `<button class="s" onclick="reinforce(${r.id},10)">${IC.ref} +10</button><button class="s" onclick="withdraw(${r.id},10)">${IC.ret} −10</button>` : ''}</span></div>`).join('')}`;
+      ${(S.ally.members || []).map(m => `<div class="row"><span>${esc(m.name)}${m.leader ? ' 👑' : ''} · guarnición ${(f.gar && f.gar[m.name]) || 0}</span><span>${m.id === S.me.id ? `<button class="s" onclick="reinforce(${r.id},10)">${IC.ref} +10</button><button class="s" onclick="withdraw(${r.id},10)">${IC.ret} −10</button>` : ''}</span></div>`).join('')}
+      <div class="mu">Los refuerzos usan primero tus tropas de mayor nivel; las retiradas también salen de las de mayor nivel.</div>`;
   } else if (f.owner) {
     h += `<div class="mu" style="margin-top:6px">Fortaleza controlada por otra alianza.</div>`;
     if (S.me.ally_id) h += `<button onclick="attackFort(${r.id})">${IC.atk} Atacar con alianza</button>`;
@@ -545,7 +557,7 @@ function vRanking() {
     ${S.me.ally_id
       ? `<div class="row"><span>Alianza</span><b>${myAlly ? '#' + myAllyPos + ' de ' + allys.length : '—'} · ${myAlly ? fmt(myAlly.points) : 0} pts</b></div>`
       : '<div class="row"><span>Alianza</span><span class="mu">Sin alianza</span></div>'}
-    <p class="mu small">Puntos = KB + tropas + 10 por nivel de edificio + tropas en fortalezas.</p>
+    <p class="mu small">Puntos = KB + poder del ejército + 10 por nivel de edificio + poder en fortalezas.</p>
   </div>
 
   <div class="card"><h3>🏆 Ranking de jugadores</h3>
@@ -574,17 +586,37 @@ function vRanking() {
 /* ------------------------- ejército ------------------------- */
 
 function vEj() {
-  const q = RACES[S.me.race];
+  const q = RACES[S.me.race] || RACES.alianza;
   const b = S.me.buildings;
-  const d = 1 - 0.05 * (b.cuartel - 1);
+  const army = S.me.army || {};
+  const power = armyPower(army);
+  const discount = 1 - 0.05 * (b.cuartel - 1);
+  const discountPct = Math.round((1 - discount) * 100);
+
+  const rows = TIERS.map(t => {
+    const locked = b.cuartel < t.lvl;
+    const count = Number(army[t.k]) || 0;
+    const cf = Math.ceil(t.cf * discount);
+    const cg = Math.ceil(t.cg * discount);
+    return `<div class="train-row ${locked ? 'locked' : ''}">
+      <div><b>${t.e} ${tierName(t)}</b> <span class="mu">· nv ${t.lvl} · ⚔️ ${t.p} c/u · tienes ${fmt(count)}</span><br>
+      <span class="mu">${locked ? `🔒 Requiere cuartel nv ${t.lvl}` : `${cf}🌾 + ${cg}🪙 por unidad`}</span></div>
+      <div class="train-actions">${locked ? '' : `<button class="s" onclick="train(10,'${t.k}')">+10</button><button class="s" onclick="train(50,'${t.k}')">+50</button><button class="s" onclick="train(100,'${t.k}')">+100</button>`}</div>
+    </div>`;
+  }).join('');
+
   return `<div class="card"><h3>${q.e} ${q.n}</h3><div class="mu">${q.d}</div>
     <div>Ataque ×${q.atk} · Defensa ×${q.def} · Recolección ×${q.gat}</div>
+    <div class="mu">Horda: +25% ataque, −20% recolección · Alianza: equilibrada · Enanos: −20% ataque, −5% defensa, +30% recolección.</div>
+    <div class="army-summary">Poder del ejército: ⚔️ <b>${fmt(power * q.atk)}</b> · 🛡️ <b>${fmt(power * q.def)}</b></div>
     <p class="mu">Balance: ataque × recolección ≈ 1.0 en todas las razas.</p></div>
 
-  <div class="card"><h3>Entrenar tropas</h3>
-    <div class="mu">Cada tropa: ${Math.ceil(5 * d)}🌾 + ${Math.ceil(3 * d)}🪙 (descuento por cuartel).</div>
-    <button onclick="train(10)">+10</button><button onclick="train(50)">+50</button><button onclick="train(100)">+100</button>
-    <div style="margin-top:6px">Tropas: <b>${S.me.troops}</b></div></div>
+  <div class="card"><h3>Entrenar tropas · Cuartel nv ${b.cuartel}</h3>
+    <div class="mu">Descuento actual: ${discountPct}%. Subir el cuartel abarata las tropas y desbloquea unidades mejores.</div>
+    ${rows}
+    <div class="army-summary">Tropas: <b>${fmt(S.me.troops)}</b> · Poder base: <b>${fmt(power)}</b><br>
+      <span class="mu">Composición: ${TIERS.filter(t => Number(army[t.k]) > 0).map(t => `${t.e} ${tierName(t)} ${fmt(army[t.k])}`).join(' · ') || 'sin tropas'}</span></div>
+  </div>
 
   <div class="card"><h3>🏗️ Edificios</h3>
     ${Object.entries(BLD).map(([k, v]) => {
@@ -725,7 +757,7 @@ function vLog() {
 
 /* ------------------------- acciones ------------------------- */
 
-function train(n) { rpc('train_troops', { p_n: n }, 'Tropas entrenadas'); }
+function train(n, tier = 't1') { rpc('train_troops', { p_n: n, p_tier: tier }, 'Tropas entrenadas'); }
 function upgrade(k) { rpc('upgrade_building', { p_key: k }, 'Edificio mejorado'); }
 function attackNpc(ri, npcId) { rpc('launch_npc_attack', { p_region: ri, p_npc: npcId }, 'Ataque en marcha'); }
 function attackFort(ri) { rpc('launch_fort_attack', { p_region: ri }, 'Ataque de alianza en marcha'); }
@@ -818,7 +850,7 @@ function tick() {
   resolveDue();
   if (++pollCounter >= 4) {
     pollCounter = 0;
-    if (document.visibilityState === 'visible' && !refreshing) refresh();
+    if (document.visibilityState === 'visible' && !refreshPromise) refresh();
   }
 }
 
