@@ -101,3 +101,43 @@ body.auth main{padding:0;max-width:none;display:grid;place-items:center;min-heig
 .train-actions{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
 .train-actions button{min-width:0;padding:6px 7px;font-size:11px}
 .army-summary{margin-top:8px;padding-top:8px;border-top:1px solid rgba(184,203,225,.1);font-size:13px}
+
+/* ------------------------- Edificios ------------------------- */
+.bld-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px;margin:10px 0}
+.bld-stat{background:rgba(39,61,84,.55);border:1px solid var(--line);border-radius:9px;padding:8px 10px;min-width:0}
+.bld-stat span{display:block;color:var(--mu);font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bld-stat b{display:block;margin-top:2px;color:var(--ac2);font-size:15px;font-variant-numeric:tabular-nums}
+.bld-prod{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:6px;margin-top:8px}
+.bld-prod-item{display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:11px;color:#d6e2ee}
+.bld-prod-item b{color:var(--ac2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.bld-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin:12px 0}
+.bld-card{position:relative;background:linear-gradient(145deg,rgba(23,37,55,.96),rgba(14,25,39,.98));border:1px solid var(--line);border-radius:13px;padding:13px;box-shadow:0 8px 22px rgba(0,0,0,.18);min-width:0;overflow:hidden}
+.bld-card:after{content:"";position:absolute;inset:0 auto 0 0;width:2px;background:linear-gradient(180deg,transparent,rgba(214,173,98,.42),transparent);pointer-events:none}
+.bld-top{display:flex;align-items:center;gap:9px;min-width:0}
+.bld-ico{display:grid;place-items:center;flex:0 0 auto;width:36px;height:36px;border-radius:9px;background:rgba(214,173,98,.12);border:1px solid rgba(214,173,98,.28);font-size:20px}
+.bld-title{display:flex;align-items:center;justify-content:space-between;gap:7px;flex:1;min-width:0}
+.bld-title b{font-size:13px;color:#f1f5fa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bld-desc{min-height:34px;margin:7px 0 2px;font-size:11px}
+.bld-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+.bld-stats>div{background:rgba(7,15,25,.38);border:1px solid rgba(184,203,225,.08);border-radius:7px;padding:6px 7px;min-width:0}
+.bld-stats span{display:block;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bld-stats b{display:block;margin-top:2px;font-size:11px;line-height:1.35;color:#e7eef6;overflow-wrap:anywhere}
+.bld-bar{height:5px;border-radius:99px;background:rgba(7,15,25,.65);border:1px solid rgba(184,203,225,.08);overflow:hidden;margin:3px 0 9px}
+.bld-bar span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#8b6a34,#e2bd73);box-shadow:0 0 8px rgba(226,189,115,.28)}
+.bld-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.bld-cost{color:var(--mu);font-size:10px;font-variant-numeric:tabular-nums}
+.bld-foot button{margin:0;white-space:nowrap}
+.bld-unlock{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(184,203,225,.08)}
+.bld-unlock:last-child{border-bottom:0}
+.bld-unlock-ico{width:28px;text-align:center;font-size:20px;filter:grayscale(1);opacity:.45}
+.bld-unlock.done .bld-unlock-ico{filter:none;opacity:1}
+.bld-unlock>div{display:flex;flex-direction:column;flex:1;min-width:0}
+.bld-unlock>div b{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bld-unlock>div span{font-size:10px;color:var(--mu)}
+.bld-unlock .badge{flex:0 0 auto}
+.bld-unlock:not(.done) .badge{background:rgba(255,255,255,.045);border-color:rgba(184,203,225,.16);color:var(--mu)}
+@media(max-width:520px){
+  .bld-grid{grid-template-columns:1fr}
+  .bld-desc{min-height:0}
+  .bld-stat b{font-size:13px}
+}

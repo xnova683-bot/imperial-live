@@ -20,9 +20,13 @@ const BLD = {
   granja:['🌾','Granja'], aserradero:['🪵','Aserradero'], cantera:['🪨','Cantera'],
   mina:['🪙','Mina'], cuartel:['🪖','Cuartel'], muralla:['🧱','Muralla']
 };
-const EFF = {
-  granja:'+15% comida/nv', aserradero:'+15% madera/nv', cantera:'+15% piedra/nv',
-  mina:'+15% oro/nv', cuartel:'−5% coste/nv · desbloquea tropas', muralla:'+5% defensa guarnición/nv'
+const BLD_DESC = {
+  granja:'Produce comida para entrenar tropas y mantener tu ejército.',
+  aserradero:'Produce madera para mejorar los edificios de tu ciudad.',
+  cantera:'Produce piedra para construir y reforzar tus defensas.',
+  mina:'Produce oro para entrenar tropas y comerciar en el mercado.',
+  cuartel:'Abarata el entrenamiento y desbloquea tropas de nivel superior.',
+  muralla:'Aumenta la defensa de la guarnición en tus fortalezas.'
 };
 const TIERS = [
   { k:'t1', lvl:1,  p:1,    cf:5,  cg:3,  e:'🗡️', n:{horda:'Saqueadores',alianza:'Milicia',enanos:'Mineros'} },
@@ -250,8 +254,8 @@ function render(force) {
   if (tab === 'admin' && !S.me.is_admin) tab = 'mapa';
   drawTop();
   const tabs = [
-    ['mapa','🗺️','Mapa'], ['ranking','🏆','Ranking'], ['ejercito','🪖','Ejército'],
-    ['alianza','🤝','Alianza'], ['mercado','🏪','Mercado'],
+    ['mapa','🗺️','Mapa'], ['ranking','🏆','Ranking'], ['edificios','🏗️','Edificios'],
+    ['ejercito','🪖','Ejército'], ['alianza','🤝','Alianza'], ['mercado','🏪','Mercado'],
     ...(S.me.is_admin ? [['admin','👑','Admin']] : []),
     ['cuenta','🔑','Cuenta'], ['registro','📜','Registro']
   ];
@@ -352,6 +356,7 @@ function updateTimers() {
 function view() {
   switch (tab) {
     case 'ranking': return vRanking();
+    case 'edificios': return vEd();
     case 'ejercito': return vEj();
     case 'alianza': return vAl();
     case 'mercado': return vMe();
@@ -616,18 +621,91 @@ function vEj() {
     ${rows}
     <div class="army-summary">Tropas: <b>${fmt(S.me.troops)}</b> · Poder base: <b>${fmt(power)}</b><br>
       <span class="mu">Composición: ${TIERS.filter(t => Number(army[t.k]) > 0).map(t => `${t.e} ${tierName(t)} ${fmt(army[t.k])}`).join(' · ') || 'sin tropas'}</span></div>
+    <div class="army-summary"><button class="s" onclick="gotoTab('edificios')">🏗️ Gestionar edificios</button></div>
   </div>
 
-  <div class="card"><h3>🏗️ Edificios</h3>
-    ${Object.entries(BLD).map(([k, v]) => {
-      const lvl = b[k];
-      const c = bcost(lvl);
-      return `<div class="row"><span>${v[0]} ${v[1]} <b>nv ${lvl}</b><br><span class="mu">${EFF[k]}</span></span>
-        <span class="mu" style="text-align:right">${lvl >= 10 ? 'MÁX' : `🪵${c.wood} 🪨${c.stone} 🪙${c.gold}`}<br>
-        <button ${lvl >= 10 ? 'disabled' : ''} onclick="upgrade('${k}')">Mejorar</button></span></div>`;
-    }).join('')}</div>
-
   <div class="card"><h3>Leyenda de movimientos</h3>${IC.atk} Ataque · ${IC.car} Caravana · ${IC.ref} Refuerzos · ${IC.ret} Retirada</div>`;
+}
+
+/* ------------------------- edificios ------------------------- */
+
+function bldNow(k, lvl) {
+  if (k === 'cuartel') {
+    const discount = Math.round((1 - (1 - 0.05 * (lvl - 1))) * 100);
+    return `${discount}% menos coste · ${TIERS.filter(t => lvl >= t.lvl).length}/4 niveles`;
+  }
+  if (k === 'muralla') return `+${Math.round((lvl - 1) * 5)}% defensa de fortalezas`;
+  return `+${Math.round((lvl - 1) * 15)}% · ${kb(rate(BK[k]) * 60)}/min`;
+}
+
+function bldNext(k, lvl) {
+  const next = lvl + 1;
+  if (k === 'cuartel') {
+    const discount = Math.round((1 - (1 - 0.05 * lvl)) * 100);
+    return `${discount}% menos coste · ${TIERS.filter(t => next >= t.lvl).length}/4 niveles`;
+  }
+  if (k === 'muralla') return `+${Math.round(lvl * 5)}% defensa de fortalezas`;
+  const nextRate = 0.5 * S.me.gat * (1 + 0.15 * lvl);
+  return `+${Math.round(lvl * 15)}% · ${kb(nextRate * 60)}/min`;
+}
+
+function vEd() {
+  const b = S.me.buildings;
+  const res = estRes();
+  const totalLvl = Object.keys(BLD).reduce((n, k) => n + (Number(b[k]) || 1), 0);
+  const totalRate = Object.keys(RES).reduce((n, k) => n + rate(k), 0);
+  const wallBonus = Math.round(((Number(b.muralla) || 1) - 1) * 5);
+
+  const prod = Object.entries(RES).map(([k, v]) =>
+    `<div class="bld-prod-item"><span>${v[0]} ${v[1]}</span><b>${kb(rate(k) * 60)}/min</b></div>`
+  ).join('');
+
+  const cards = Object.entries(BLD).map(([k, v]) => {
+    const lvl = Number(b[k]) || 1;
+    const max = lvl >= 10;
+    const c = bcost(lvl);
+    const afford = res.wood >= c.wood && res.stone >= c.stone && res.gold >= c.gold;
+    return `<div class="bld-card">
+      <div class="bld-top">
+        <span class="bld-ico">${v[0]}</span>
+        <div class="bld-title"><b>${v[1]}</b><span class="badge">Nv ${lvl}/10</span></div>
+      </div>
+      <div class="mu bld-desc">${BLD_DESC[k]}</div>
+      <div class="bld-stats">
+        <div><span class="mu">Ahora</span><b>${bldNow(k, lvl)}</b></div>
+        <div><span class="mu">${max ? 'Nivel máximo' : 'Siguiente nivel'}</span><b>${max ? '—' : bldNext(k, lvl)}</b></div>
+      </div>
+      <div class="bld-bar"><span style="width:${lvl * 10}%"></span></div>
+      <div class="bld-foot">
+        <span class="bld-cost">${max ? '✅ Completado' : `🪵 ${fmt(c.wood)} · 🪨 ${fmt(c.stone)} · 🪙 ${fmt(c.gold)}`}</span>
+        <button ${max || !afford ? 'disabled' : ''} onclick="upgrade('${k}')">${max ? 'MÁX' : afford ? 'Mejorar' : 'Faltan recursos'}</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const unlocks = TIERS.map(t => {
+    const done = b.cuartel >= t.lvl;
+    return `<div class="bld-unlock ${done ? 'done' : ''}">
+      <span class="bld-unlock-ico">${t.e}</span>
+      <div><b>${tierName(t)}</b><span class="mu">Cuartel nivel ${t.lvl}</span></div>
+      <span class="badge">${done ? 'Desbloqueado' : 'Bloqueado'}</span>
+    </div>`;
+  }).join('');
+
+  return `<div class="card"><h3>🏗️ Edificios de la ciudad</h3>
+    <div class="bld-summary">
+      <div class="bld-stat"><span>Nivel total</span><b>${totalLvl}/60</b></div>
+      <div class="bld-stat"><span>Producción total</span><b>${kb(totalRate * 60)}/min</b></div>
+      <div class="bld-stat"><span>Cuartel</span><b>Nv ${b.cuartel}/10</b></div>
+      <div class="bld-stat"><span>Defensa de muralla</span><b>+${wallBonus}%</b></div>
+    </div>
+    <div class="bld-prod">${prod}</div>
+    <p class="mu small">Las mejoras son instantáneas. La muralla protege la guarnición de las fortalezas; el cuartel abarata y desbloquea tropas.</p>
+  </div>
+
+  <div class="bld-grid">${cards}</div>
+
+  <div class="card"><h3>🪖 Desbloqueos del cuartel</h3>${unlocks}</div>`;
 }
 
 function bcost(lvl) { return { wood: 80 * lvl, stone: 60 * lvl, gold: 40 * lvl }; }
