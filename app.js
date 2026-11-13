@@ -31,10 +31,21 @@ const BLD_DESC = {
 const BLD_MAX = 30;
 const BLD_TOTAL_MAX = Object.keys(BLD).length * BLD_MAX;
 const TIERS = [
-  { k:'t1', lvl:1,  p:1,    cf:5,  cg:3,  e:'🗡️', n:{horda:'Saqueadores',alianza:'Milicia',enanos:'Mineros'} },
-  { k:'t2', lvl:4,  p:2.6,  cf:11, cg:7,  e:'⚔️', n:{horda:'Jinetes',alianza:'Soldados',enanos:'Ballesteros'} },
-  { k:'t3', lvl:7,  p:6.5,  cf:24, cg:15, e:'🛡️', n:{horda:'Berserkers',alianza:'Caballeros',enanos:'Guardianes'} },
-  { k:'t4', lvl:10, p:16,   cf:52, cg:33, e:'👑', n:{horda:'Señores de la Guerra',alianza:'Guardia Real',enanos:'Martilladores'} }
+  { k:'t1',  lvl:1,  p:1,    cf:5,   cg:3,   e:'🗡️', n:{horda:'Saqueadores',alianza:'Milicia',enanos:'Mineros'} },
+  { k:'t2',  lvl:3,  p:1.6,  cf:8,   cg:5,   e:'🏹', n:{horda:'Jinetes',alianza:'Lanceros',enanos:'Ballesteros'} },
+  { k:'t3',  lvl:5,  p:2.6,  cf:11,  cg:7,   e:'🪓', n:{horda:'Hacheros',alianza:'Soldados',enanos:'Guardianes'} },
+  { k:'t4',  lvl:7,  p:4.2,  cf:16,  cg:10,  e:'⚔️', n:{horda:'Berserkers',alianza:'Caballeros',enanos:'Martilladores'} },
+  { k:'t5',  lvl:9,  p:6.5,  cf:24,  cg:15,  e:'🐺', n:{horda:'Lobos de Guerra',alianza:'Ballesteros',enanos:'Vanguardia'} },
+  { k:'t6',  lvl:11, p:10,   cf:36,  cg:22,  e:'🔮', n:{horda:'Chamanes',alianza:'Espadachines',enanos:'Runistas'} },
+  { k:'t7',  lvl:13, p:16,   cf:52,  cg:33,  e:'🗿', n:{horda:'Ogros',alianza:'Guardias Reales',enanos:'Golems'} },
+  { k:'t8',  lvl:15, p:21,   cf:70,  cg:45,  e:'🦖', n:{horda:'Raptores',alianza:'Arqueros Reales',enanos:'Arcabuceros'} },
+  { k:'t9',  lvl:17, p:27,   cf:90,  cg:60,  e:'👑', n:{horda:'Señores de la Guerra',alianza:'Paladines',enanos:'Colosos'} },
+  { k:'t10', lvl:19, p:34,   cf:115, cg:78,  e:'😈', n:{horda:'Demonios',alianza:'Campeones',enanos:'Rompehileras'} },
+  { k:'t11', lvl:21, p:42,   cf:145, cg:100, e:'👹', n:{horda:'Titanes',alianza:'Inquisidores',enanos:'Guardia de Mithril'} },
+  { k:'t12', lvl:23, p:51,   cf:180, cg:125, e:'🐉', n:{horda:'Devoradores',alianza:'Caballeros de Plata',enanos:'Ingenieros de Asedio'} },
+  { k:'t13', lvl:25, p:61,   cf:220, cg:155, e:'🩸', n:{horda:'Azotes de Sangre',alianza:'Generales',enanos:'Bastiones Vivientes'} },
+  { k:'t14', lvl:27, p:72,   cf:270, cg:190, e:'🐲', n:{horda:'Dragones de Fuego',alianza:'Arcángeles',enanos:'Colosos de Granito'} },
+  { k:'t15', lvl:29, p:84,   cf:330, cg:230, e:'🔱', n:{horda:'Avatares de la Guerra',alianza:'Legión Imperial',enanos:'Reyes de la Montaña'} }
 ];
 const IC = { atk:'⚔️', car:'🚚', ref:'🛡️', ret:'↩️' };
 const RT_TABLES = ['event_log','offers','alliances','alliance_members','fort_garrison','marches','building_upgrades'];
@@ -644,8 +655,8 @@ function vEj() {
     <p class="mu">Balance: ataque × recolección ≈ 1.0 en todas las razas.</p></div>
 
   <div class="card"><h3>Entrenar tropas · Cuartel nv ${b.cuartel}</h3>
-    <div class="mu">Descuento actual: ${discountPct}%. Subir el cuartel abarata las tropas y desbloquea unidades mejores.</div>
-    ${rows}
+    <div class="mu">15 tropas: una nueva cada 2 niveles de cuartel (nv 1, 3, 5…29). Descuento actual: ${discountPct}%. Subir el cuartel abarata las tropas y desbloquea unidades mejores.</div>
+    <div class="train-list">${rows}</div>
     <div class="army-summary">Tropas: <b>${fmt(S.me.troops)}</b> · Poder base: <b>${fmt(power)}</b><br>
       <span class="mu">Composición: ${TIERS.filter(t => Number(army[t.k]) > 0).map(t => `${t.e} ${tierName(t)} ${fmt(army[t.k])}`).join(' · ') || 'sin tropas'}</span></div>
     <div class="army-summary"><button class="s" onclick="gotoTab('edificios')">🏗️ Gestionar edificios</button></div>
@@ -659,7 +670,7 @@ function vEj() {
 function bldNow(k, lvl) {
   if (k === 'cuartel') {
     const discount = Math.round((1 - Math.pow(0.95, lvl - 1)) * 100);
-    return `${discount}% menos coste · ${TIERS.filter(t => lvl >= t.lvl).length}/4 niveles`;
+    return `${discount}% menos coste · ${TIERS.filter(t => lvl >= t.lvl).length}/15 tropas`;
   }
   if (k === 'muralla') return `+${Math.round((lvl - 1) * 5)}% defensa de fortalezas`;
   return `+${Math.round((lvl - 1) * 15)}% · ${kb(rate(BK[k]) * 60)}/min`;
@@ -669,7 +680,7 @@ function bldNext(k, lvl) {
   const next = lvl + 1;
   if (k === 'cuartel') {
     const discount = Math.round((1 - Math.pow(0.95, lvl)) * 100);
-    return `${discount}% menos coste · ${TIERS.filter(t => next >= t.lvl).length}/4 niveles`;
+    return `${discount}% menos coste · ${TIERS.filter(t => next >= t.lvl).length}/15 tropas`;
   }
   if (k === 'muralla') return `+${Math.round(lvl * 5)}% defensa de fortalezas`;
   const nextRate = 0.5 * S.me.gat * (1 + 0.15 * lvl);
@@ -742,7 +753,7 @@ function vEd() {
 
   <div class="bld-grid">${cards}</div>
 
-  <div class="card"><h3>🪖 Desbloqueos del cuartel</h3>${unlocks}</div>`;
+  <div class="card"><h3>🪖 Desbloqueos del cuartel</h3><div class="bld-unlocks">${unlocks}</div></div>`;
 }
 
 function bcost(lvl) { return { wood: 80 * lvl, stone: 60 * lvl, gold: 40 * lvl }; }
