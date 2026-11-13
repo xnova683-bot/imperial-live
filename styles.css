@@ -113,6 +113,8 @@ body.auth main{padding:0;max-width:none;display:grid;place-items:center;min-heig
 .bld-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin:12px 0}
 .bld-card{position:relative;background:linear-gradient(145deg,rgba(23,37,55,.96),rgba(14,25,39,.98));border:1px solid var(--line);border-radius:13px;padding:13px;box-shadow:0 8px 22px rgba(0,0,0,.18);min-width:0;overflow:hidden}
 .bld-card:after{content:"";position:absolute;inset:0 auto 0 0;width:2px;background:linear-gradient(180deg,transparent,rgba(214,173,98,.42),transparent);pointer-events:none}
+.bld-card.upgrading{border-color:rgba(101,200,154,.34)}
+.bld-card.upgrading:after{background:linear-gradient(180deg,transparent,rgba(101,200,154,.58),transparent)}
 .bld-top{display:flex;align-items:center;gap:9px;min-width:0}
 .bld-ico{display:grid;place-items:center;flex:0 0 auto;width:36px;height:36px;border-radius:9px;background:rgba(214,173,98,.12);border:1px solid rgba(214,173,98,.28);font-size:20px}
 .bld-title{display:flex;align-items:center;justify-content:space-between;gap:7px;flex:1;min-width:0}
@@ -124,6 +126,10 @@ body.auth main{padding:0;max-width:none;display:grid;place-items:center;min-heig
 .bld-stats b{display:block;margin-top:2px;font-size:11px;line-height:1.35;color:#e7eef6;overflow-wrap:anywhere}
 .bld-bar{height:5px;border-radius:99px;background:rgba(7,15,25,.65);border:1px solid rgba(184,203,225,.08);overflow:hidden;margin:3px 0 9px}
 .bld-bar span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#8b6a34,#e2bd73);box-shadow:0 0 8px rgba(226,189,115,.28)}
+.bld-bar.work{margin-top:-4px}
+.bld-bar.work span{background:linear-gradient(90deg,#2e7d5b,#65c89a);box-shadow:0 0 8px rgba(101,200,154,.35)}
+.bld-eta{display:inline-block;margin-top:3px;color:var(--mu);font-size:10px;font-variant-numeric:tabular-nums}
+.bld-timer{display:inline-block;margin-top:3px;color:var(--ok);font-size:10px;font-weight:800;font-variant-numeric:tabular-nums}
 .bld-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .bld-cost{color:var(--mu);font-size:10px;font-variant-numeric:tabular-nums}
 .bld-foot button{margin:0;white-space:nowrap}

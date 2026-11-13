@@ -28,6 +28,8 @@ const BLD_DESC = {
   cuartel:'Abarata el entrenamiento y desbloquea tropas de nivel superior.',
   muralla:'Aumenta la defensa de la guarnición en tus fortalezas.'
 };
+const BLD_MAX = 30;
+const BLD_TOTAL_MAX = Object.keys(BLD).length * BLD_MAX;
 const TIERS = [
   { k:'t1', lvl:1,  p:1,    cf:5,  cg:3,  e:'🗡️', n:{horda:'Saqueadores',alianza:'Milicia',enanos:'Mineros'} },
   { k:'t2', lvl:4,  p:2.6,  cf:11, cg:7,  e:'⚔️', n:{horda:'Jinetes',alianza:'Soldados',enanos:'Ballesteros'} },
@@ -35,7 +37,7 @@ const TIERS = [
   { k:'t4', lvl:10, p:16,   cf:52, cg:33, e:'👑', n:{horda:'Señores de la Guerra',alianza:'Guardia Real',enanos:'Martilladores'} }
 ];
 const IC = { atk:'⚔️', car:'🚚', ref:'🛡️', ret:'↩️' };
-const RT_TABLES = ['event_log','offers','alliances','alliance_members','fort_garrison','marches'];
+const RT_TABLES = ['event_log','offers','alliances','alliance_members','fort_garrison','marches','building_upgrades'];
 
 /* ------------------------- estado global ------------------------- */
 
@@ -71,6 +73,22 @@ function armyTotal(a) { return TIERS.reduce((x, t) => x + (Number(a?.[t.k]) || 0
 function armyPower(a) { return TIERS.reduce((x, t) => x + (Number(a?.[t.k]) || 0) * t.p, 0); }
 function srvNow() { return Date.now() + serverSkew; }
 function remaining(iso) { return Math.max(0, Math.ceil((new Date(iso).getTime() - srvNow()) / 1000)); }
+function fmtTime(sec) {
+  sec = Math.max(0, Math.ceil(Number(sec) || 0));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+           : `${m}:${String(s).padStart(2, '0')}`;
+}
+function bldTime(lvl) { return Math.max(30, Math.ceil(30 * Math.pow(lvl, 1.5))); }
+function buildFor(k) { return (S?.builds || []).find(x => x.key === k); }
+function buildPct(bu) {
+  const start = new Date(bu.start_at).getTime();
+  const end = new Date(bu.end_at).getTime();
+  if (!(end > start)) return 100;
+  return Math.max(0, Math.min(100, ((srvNow() - start) / (end - start)) * 100));
+}
 
 function toast(msg, type = 'ok') {
   const el = $('toast');
@@ -351,6 +369,15 @@ function updateTimers() {
   $('marches').innerHTML = ms.length
     ? ms.map(m => `${m.icon} ${esc(m.label)} · ${remaining(m.end_at)}s`).join('<br>')
     : '';
+  const builds = S.builds || [];
+  document.querySelectorAll('[data-bld-timer]').forEach(el => {
+    const bu = builds.find(x => x.key === el.dataset.bldTimer);
+    if (bu) el.textContent = '⏳ ' + fmtTime(remaining(bu.end_at));
+  });
+  document.querySelectorAll('[data-bld-progress]').forEach(el => {
+    const bu = builds.find(x => x.key === el.dataset.bldProgress);
+    if (bu) el.style.width = buildPct(bu).toFixed(2) + '%';
+  });
 }
 
 function view() {
@@ -595,7 +622,7 @@ function vEj() {
   const b = S.me.buildings;
   const army = S.me.army || {};
   const power = armyPower(army);
-  const discount = 1 - 0.05 * (b.cuartel - 1);
+  const discount = Math.pow(0.95, b.cuartel - 1);
   const discountPct = Math.round((1 - discount) * 100);
 
   const rows = TIERS.map(t => {
@@ -631,7 +658,7 @@ function vEj() {
 
 function bldNow(k, lvl) {
   if (k === 'cuartel') {
-    const discount = Math.round((1 - (1 - 0.05 * (lvl - 1))) * 100);
+    const discount = Math.round((1 - Math.pow(0.95, lvl - 1)) * 100);
     return `${discount}% menos coste · ${TIERS.filter(t => lvl >= t.lvl).length}/4 niveles`;
   }
   if (k === 'muralla') return `+${Math.round((lvl - 1) * 5)}% defensa de fortalezas`;
@@ -641,7 +668,7 @@ function bldNow(k, lvl) {
 function bldNext(k, lvl) {
   const next = lvl + 1;
   if (k === 'cuartel') {
-    const discount = Math.round((1 - (1 - 0.05 * lvl)) * 100);
+    const discount = Math.round((1 - Math.pow(0.95, lvl)) * 100);
     return `${discount}% menos coste · ${TIERS.filter(t => next >= t.lvl).length}/4 niveles`;
   }
   if (k === 'muralla') return `+${Math.round(lvl * 5)}% defensa de fortalezas`;
@@ -651,10 +678,12 @@ function bldNext(k, lvl) {
 
 function vEd() {
   const b = S.me.buildings;
+  const builds = S.builds || [];
   const res = estRes();
   const totalLvl = Object.keys(BLD).reduce((n, k) => n + (Number(b[k]) || 1), 0);
   const totalRate = Object.keys(RES).reduce((n, k) => n + rate(k), 0);
   const wallBonus = Math.round(((Number(b.muralla) || 1) - 1) * 5);
+  const cuartelLvl = Number(b.cuartel) || 1;
 
   const prod = Object.entries(RES).map(([k, v]) =>
     `<div class="bld-prod-item"><span>${v[0]} ${v[1]}</span><b>${kb(rate(k) * 60)}/min</b></div>`
@@ -662,29 +691,37 @@ function vEd() {
 
   const cards = Object.entries(BLD).map(([k, v]) => {
     const lvl = Number(b[k]) || 1;
-    const max = lvl >= 10;
+    const max = lvl >= BLD_MAX;
+    const bu = buildFor(k);
     const c = bcost(lvl);
     const afford = res.wood >= c.wood && res.stone >= c.stone && res.gold >= c.gold;
-    return `<div class="bld-card">
+    const levelPct = Math.min(100, (lvl / BLD_MAX) * 100);
+    const timer = bu ? fmtTime(remaining(bu.end_at)) : '';
+    return `<div class="bld-card ${bu ? 'upgrading' : ''}">
       <div class="bld-top">
         <span class="bld-ico">${v[0]}</span>
-        <div class="bld-title"><b>${v[1]}</b><span class="badge">Nv ${lvl}/10</span></div>
+        <div class="bld-title"><b>${v[1]}</b><span class="badge">${bu ? `Nv ${lvl} → ${bu.to_level}` : `Nv ${lvl}/${BLD_MAX}`}</span></div>
       </div>
       <div class="mu bld-desc">${BLD_DESC[k]}</div>
       <div class="bld-stats">
         <div><span class="mu">Ahora</span><b>${bldNow(k, lvl)}</b></div>
-        <div><span class="mu">${max ? 'Nivel máximo' : 'Siguiente nivel'}</span><b>${max ? '—' : bldNext(k, lvl)}</b></div>
+        <div><span class="mu">${bu ? 'En mejora' : max ? 'Nivel máximo' : 'Siguiente nivel'}</span>
+          <b>${max ? '—' : bldNext(k, lvl)}</b>
+          ${bu ? `<span class="bld-timer" data-bld-timer="${k}">⏳ ${timer}</span>`
+               : max ? '' : `<span class="bld-eta">⏱ Tarda ${fmtTime(bldTime(lvl))}</span>`}
+        </div>
       </div>
-      <div class="bld-bar"><span style="width:${lvl * 10}%"></span></div>
+      <div class="bld-bar"><span style="width:${levelPct.toFixed(2)}%"></span></div>
+      ${bu ? `<div class="bld-bar work"><span data-bld-progress="${k}" style="width:${buildPct(bu).toFixed(2)}%"></span></div>` : ''}
       <div class="bld-foot">
-        <span class="bld-cost">${max ? '✅ Completado' : `🪵 ${fmt(c.wood)} · 🪨 ${fmt(c.stone)} · 🪙 ${fmt(c.gold)}`}</span>
-        <button ${max || !afford ? 'disabled' : ''} onclick="upgrade('${k}')">${max ? 'MÁX' : afford ? 'Mejorar' : 'Faltan recursos'}</button>
+        <span class="bld-cost">${bu ? '⏳ En obra' : max ? '✅ Completado' : `🪵 ${fmt(c.wood)} · 🪨 ${fmt(c.stone)} · 🪙 ${fmt(c.gold)}`}</span>
+        <button ${max || bu || !afford ? 'disabled' : ''} onclick="upgrade('${k}')">${max ? 'MÁX' : bu ? 'En obra' : afford ? 'Mejorar' : 'Faltan recursos'}</button>
       </div>
     </div>`;
   }).join('');
 
   const unlocks = TIERS.map(t => {
-    const done = b.cuartel >= t.lvl;
+    const done = cuartelLvl >= t.lvl;
     return `<div class="bld-unlock ${done ? 'done' : ''}">
       <span class="bld-unlock-ico">${t.e}</span>
       <div><b>${tierName(t)}</b><span class="mu">Cuartel nivel ${t.lvl}</span></div>
@@ -692,15 +729,15 @@ function vEd() {
     </div>`;
   }).join('');
 
-  return `<div class="card"><h3>🏗️ Edificios de la ciudad</h3>
+  return `<div class="card"><h3>🏗️ Edificios de la ciudad${builds.length ? ` · ${builds.length} en obra` : ''}</h3>
     <div class="bld-summary">
-      <div class="bld-stat"><span>Nivel total</span><b>${totalLvl}/60</b></div>
+      <div class="bld-stat"><span>Nivel total</span><b>${totalLvl}/${BLD_TOTAL_MAX}</b></div>
       <div class="bld-stat"><span>Producción total</span><b>${kb(totalRate * 60)}/min</b></div>
-      <div class="bld-stat"><span>Cuartel</span><b>Nv ${b.cuartel}/10</b></div>
+      <div class="bld-stat"><span>Cuartel</span><b>Nv ${cuartelLvl}/${BLD_MAX}</b></div>
       <div class="bld-stat"><span>Defensa de muralla</span><b>+${wallBonus}%</b></div>
     </div>
     <div class="bld-prod">${prod}</div>
-    <p class="mu small">Las mejoras son instantáneas. La muralla protege la guarnición de las fortalezas; el cuartel abarata y desbloquea tropas.</p>
+    <p class="mu small">Las mejoras tardan tiempo y cada nivel tarda más. Se completan aunque estés desconectado y puedes mejorar varios edificios a la vez. La muralla protege la guarnición de las fortalezas; el cuartel abarata y desbloquea tropas.</p>
   </div>
 
   <div class="bld-grid">${cards}</div>
@@ -836,7 +873,7 @@ function vLog() {
 /* ------------------------- acciones ------------------------- */
 
 function train(n, tier = 't1') { rpc('train_troops', { p_n: n, p_tier: tier }, 'Tropas entrenadas'); }
-function upgrade(k) { rpc('upgrade_building', { p_key: k }, 'Edificio mejorado'); }
+function upgrade(k) { rpc('upgrade_building', { p_key: k }, 'Mejora iniciada'); }
 function attackNpc(ri, npcId) { rpc('launch_npc_attack', { p_region: ri, p_npc: npcId }, 'Ataque en marcha'); }
 function attackFort(ri) { rpc('launch_fort_attack', { p_region: ri }, 'Ataque de alianza en marcha'); }
 function reinforce(ri, n) { rpc('reinforce_fort', { p_region: ri, p_n: n }, 'Refuerzos en camino'); }
@@ -914,9 +951,11 @@ async function changePassword() {
 
 async function resolveDue() {
   if (resolving || !S) return;
-  if (!(S.marches || []).some(m => remaining(m.end_at) <= 0)) return;
+  const dueMarches = (S.marches || []).some(m => remaining(m.end_at) <= 0);
+  const dueBuilds = (S.builds || []).some(b => remaining(b.end_at) <= 0);
+  if (!dueMarches && !dueBuilds) return;
   resolving = true;
-  try { await sb.rpc('resolve_due_marches'); } catch (_) {}
+  try { if (dueMarches) await sb.rpc('resolve_due_marches'); } catch (_) {}
   resolving = false;
   refresh();
 }
