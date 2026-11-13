@@ -695,7 +695,6 @@ function vEd() {
     const bu = buildFor(k);
     const c = bcost(lvl);
     const afford = res.wood >= c.wood && res.stone >= c.stone && res.gold >= c.gold;
-    const levelPct = Math.min(100, (lvl / BLD_MAX) * 100);
     const timer = bu ? fmtTime(remaining(bu.end_at)) : '';
     return `<div class="bld-card ${bu ? 'upgrading' : ''}">
       <div class="bld-top">
@@ -707,12 +706,13 @@ function vEd() {
         <div><span class="mu">Ahora</span><b>${bldNow(k, lvl)}</b></div>
         <div><span class="mu">${bu ? 'En mejora' : max ? 'Nivel máximo' : 'Siguiente nivel'}</span>
           <b>${max ? '—' : bldNext(k, lvl)}</b>
-          ${bu ? `<span class="bld-timer" data-bld-timer="${k}">⏳ ${timer}</span>`
-               : max ? '' : `<span class="bld-eta">⏱ Tarda ${fmtTime(bldTime(lvl))}</span>`}
+          ${bu || max ? '' : `<span class="bld-eta">⏱ Tarda ${fmtTime(bldTime(lvl))}</span>`}
         </div>
       </div>
-      <div class="bld-bar"><span style="width:${levelPct.toFixed(2)}%"></span></div>
-      ${bu ? `<div class="bld-bar work"><span data-bld-progress="${k}" style="width:${buildPct(bu).toFixed(2)}%"></span></div>` : ''}
+      ${bu ? `<div class="bld-work">
+        <div class="bld-work-top"><span>En construcción</span><b class="bld-timer" data-bld-timer="${k}">⏳ ${timer}</b></div>
+        <div class="bld-bar"><span data-bld-progress="${k}" style="width:${buildPct(bu).toFixed(2)}%"></span></div>
+      </div>` : ''}
       <div class="bld-foot">
         <span class="bld-cost">${bu ? '⏳ En obra' : max ? '✅ Completado' : `🪵 ${fmt(c.wood)} · 🪨 ${fmt(c.stone)} · 🪙 ${fmt(c.gold)}`}</span>
         <button ${max || bu || !afford ? 'disabled' : ''} onclick="upgrade('${k}')">${max ? 'MÁX' : bu ? 'En obra' : afford ? 'Mejorar' : 'Faltan recursos'}</button>

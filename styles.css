@@ -124,12 +124,13 @@ body.auth main{padding:0;max-width:none;display:grid;place-items:center;min-heig
 .bld-stats>div{background:rgba(7,15,25,.38);border:1px solid rgba(184,203,225,.08);border-radius:7px;padding:6px 7px;min-width:0}
 .bld-stats span{display:block;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bld-stats b{display:block;margin-top:2px;font-size:11px;line-height:1.35;color:#e7eef6;overflow-wrap:anywhere}
-.bld-bar{height:5px;border-radius:99px;background:rgba(7,15,25,.65);border:1px solid rgba(184,203,225,.08);overflow:hidden;margin:3px 0 9px}
-.bld-bar span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#8b6a34,#e2bd73);box-shadow:0 0 8px rgba(226,189,115,.28)}
-.bld-bar.work{margin-top:-4px}
-.bld-bar.work span{background:linear-gradient(90deg,#2e7d5b,#65c89a);box-shadow:0 0 8px rgba(101,200,154,.35)}
+.bld-work{margin:3px 0 9px}
+.bld-work-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+.bld-work-top span{color:var(--mu);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.bld-bar{height:6px;border-radius:99px;background:rgba(7,15,25,.65);border:1px solid rgba(184,203,225,.08);overflow:hidden}
+.bld-bar span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#2e7d5b,#65c89a);box-shadow:0 0 8px rgba(101,200,154,.35)}
 .bld-eta{display:inline-block;margin-top:3px;color:var(--mu);font-size:10px;font-variant-numeric:tabular-nums}
-.bld-timer{display:inline-block;margin-top:3px;color:var(--ok);font-size:10px;font-weight:800;font-variant-numeric:tabular-nums}
+.bld-timer{display:inline-block;color:var(--ok);font-size:10px;font-weight:800;font-variant-numeric:tabular-nums}
 .bld-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .bld-cost{color:var(--mu);font-size:10px;font-variant-numeric:tabular-nums}
 .bld-foot button{margin:0;white-space:nowrap}
