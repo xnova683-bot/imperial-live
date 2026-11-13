@@ -50,7 +50,7 @@ const TIERS = [
   { k:'t15', lvl:30, p:84,   cf:330, cg:230, e:'🏆', n:{horda:'Inmortales de la Horda',alianza:'Legión Imperial',enanos:'Hueste de la Montaña'} }
 ];
 const IC = { atk:'⚔️', car:'🚚', ref:'🛡️', ret:'↩️' };
-const RT_TABLES = ['event_log','offers','alliances','alliance_members','fort_garrison','marches','building_upgrades'];
+const RT_TABLES = ['event_log','offers','alliances','alliance_members','fort_garrison','marches','building_upgrades','training_orders'];
 
 /* ------------------------- estado global ------------------------- */
 
@@ -102,6 +102,33 @@ function buildFor(k) { return (S?.builds || []).find(x => x.key === k); }
 function buildPct(bu) {
   const start = new Date(bu.start_at).getTime();
   const end = new Date(bu.end_at).getTime();
+  if (!(end > start)) return 100;
+  return Math.max(0, Math.min(100, ((srvNow() - start) / (end - start)) * 100));
+}
+function tierByKey(k) { return TIERS.find(t => t.k === k) || null; }
+function trainTime(n, tierKey) {
+  const no = Number(String(tierKey || 't1').slice(1)) || 1;
+  return Math.max(5, Math.ceil(Math.max(1, n) * (1.5 + 0.15 * (no - 1))));
+}
+function trainCost(t, n) {
+  const d = Math.pow(0.95, (Number(S.me.buildings.cuartel) || 1) - 1);
+  return { food: Math.ceil(t.cf * n * d), gold: Math.ceil(t.cg * n * d) };
+}
+function maxTrainable(t) {
+  if ((Number(S.me.buildings.cuartel) || 1) < t.lvl) return 0;
+  const res = estRes();
+  let lo = 0, hi = 1000;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    const c = trainCost(t, mid);
+    if (c.food <= res.food && c.gold <= res.gold) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
+}
+function trainPct(tr) {
+  const start = new Date(tr.start_at).getTime();
+  const end = new Date(tr.end_at).getTime();
   if (!(end > start)) return 100;
   return Math.max(0, Math.min(100, ((srvNow() - start) / (end - start)) * 100));
 }
@@ -394,6 +421,15 @@ function updateTimers() {
     const bu = builds.find(x => x.key === el.dataset.bldProgress);
     if (bu) el.style.width = buildPct(bu).toFixed(2) + '%';
   });
+  const train = S.train;
+  if (train) {
+    document.querySelectorAll('[data-train-timer]').forEach(el => {
+      el.textContent = '⏳ ' + fmtTime(remaining(train.end_at));
+    });
+    document.querySelectorAll('[data-train-progress]').forEach(el => {
+      el.style.width = trainPct(train).toFixed(2) + '%';
+    });
+  }
 }
 
 function view() {
@@ -640,18 +676,32 @@ function vEj() {
   const power = armyPower(army);
   const discount = Math.pow(0.95, b.cuartel - 1);
   const discountPct = Math.round((1 - discount) * 100);
+  const train = S.train || null;
+  const trainTier = train ? tierByKey(train.tier) : null;
+  const busy = !!train;
 
   const rows = TIERS.map(t => {
     const locked = b.cuartel < t.lvl;
     const count = Number(army[t.k]) || 0;
     const cf = Math.ceil(t.cf * discount);
     const cg = Math.ceil(t.cg * discount);
+    const actions = locked ? '' : `<div class="train-actions">
+      <input class="train-qty" id="tq_${t.k}" type="number" min="1" max="1000" step="1" value="10" ${busy ? 'disabled' : ''} aria-label="Cantidad de ${tierName(t)}">
+      <button class="s" ${busy ? 'disabled' : ''} onclick="trainInput('${t.k}')">Entrenar</button>
+      <button class="s" ${busy ? 'disabled' : ''} onclick="trainMax('${t.k}')" title="Calcular el máximo que puedes pagar">Máx</button>
+    </div>`;
     return `<div class="train-row ${locked ? 'locked' : ''}">
       <div><b>${t.e} ${tierName(t)}</b> <span class="mu">· nv ${t.lvl} · ⚔️ ${t.p} c/u · tienes ${fmt(count)}</span><br>
       <span class="mu">${locked ? `🔒 Requiere cuartel nv ${t.lvl}` : `${cf}🌾 + ${cg}🪙 por unidad`}</span></div>
-      <div class="train-actions">${locked ? '' : `<button class="s" onclick="train(10,'${t.k}')">+10</button><button class="s" onclick="train(50,'${t.k}')">+50</button><button class="s" onclick="train(100,'${t.k}')">+100</button>`}</div>
+      ${actions}
     </div>`;
   }).join('');
+
+  const trainBox = train && trainTier ? `<div class="bld-work train-live">
+    <div class="bld-work-top"><span>En entrenamiento: ${trainTier.e} ${tierName(trainTier)} · ${fmt(train.qty)}</span><b class="bld-timer" data-train-timer>⏳ ${fmtTime(remaining(train.end_at))}</b></div>
+    <div class="bld-bar"><span data-train-progress style="width:${trainPct(train).toFixed(2)}%"></span></div>
+    <div class="mu small">Se completará aunque estés desconectado. Solo puedes entrenar un lote a la vez.</div>
+  </div>` : '';
 
   return `<div class="card"><h3>${q.e} ${q.n}</h3><div class="mu">${q.d}</div>
     <div>Ataque ×${q.atk} · Defensa ×${q.def} · Recolección ×${q.gat}</div>
@@ -660,10 +710,12 @@ function vEj() {
     <p class="mu">Balance: ataque × recolección ≈ 1.0 en todas las razas.</p></div>
 
   <div class="card"><h3>Entrenar tropas · Cuartel nv ${b.cuartel}</h3>
-    <div class="mu">15 tropas: una nueva cada 2 niveles de cuartel (nv 1, 3, 5…27) y la unidad final al nivel 30. Descuento actual: ${discountPct}%. Subir el cuartel abarata las tropas y desbloquea unidades mejores.</div>
+    <div class="mu">15 tropas: una nueva cada 2 niveles de cuartel (nv 1, 3, 5…27) y la unidad final al nivel 30. Descuento actual: ${discountPct}%. Escribe la cantidad, pulsa Entrenar y verás la barra de progreso. Máx calcula lo que puedes pagar con tus recursos actuales.</div>
+    ${trainBox}
     <div class="train-list">${rows}</div>
     <div class="army-summary">Tropas: <b>${fmt(S.me.troops)}</b> · Poder base: <b>${fmt(power)}</b><br>
-      <span class="mu">Composición: ${TIERS.filter(t => Number(army[t.k]) > 0).map(t => `${t.e} ${tierName(t)} ${fmt(army[t.k])}`).join(' · ') || 'sin tropas'}</span></div>
+      <span class="mu">Composición: ${TIERS.filter(t => Number(army[t.k]) > 0).map(t => `${t.e} ${tierName(t)} ${fmt(army[t.k])}`).join(' · ') || 'sin tropas'}</span>
+      ${train && trainTier ? `<br><span class="mu">En entrenamiento: ${fmt(train.qty)} ${trainTier.e} ${tierName(trainTier)}</span>` : ''}</div>
     <div class="army-summary"><button class="s" onclick="gotoTab('edificios')">🏗️ Gestionar edificios</button></div>
   </div>
 
@@ -891,7 +943,30 @@ function vLog() {
 
 /* ------------------------- acciones ------------------------- */
 
-function train(n, tier = 't1') { rpc('train_troops', { p_n: n, p_tier: tier }, 'Tropas entrenadas'); }
+function train(n, tier = 't1') { rpc('train_troops', { p_n: n, p_tier: tier }, 'Entrenamiento iniciado'); }
+function trainInput(tier) {
+  const t = tierByKey(tier);
+  if (!t) return;
+  if (S.train) return toast('El cuartel ya está entrenando tropas', 'bad');
+  const input = $('tq_' + tier);
+  const n = Math.floor(Number(input && input.value));
+  if (!Number.isFinite(n) || n < 1) return toast('Escribe una cantidad válida', 'bad');
+  if (n > 1000) return toast('Máximo 1000 tropas por entrenamiento', 'bad');
+  train(n, tier);
+}
+function trainMax(tier) {
+  const t = tierByKey(tier);
+  if (!t) return;
+  if (S.train) return toast('El cuartel ya está entrenando tropas', 'bad');
+  const n = maxTrainable(t);
+  const input = $('tq_' + tier);
+  if (!n) {
+    if (input) input.value = 1;
+    return toast('No tienes recursos suficientes', 'bad');
+  }
+  if (input) { input.value = n; input.focus(); }
+  toast(`Máximo disponible: ${fmt(n)} ${tierName(t)}`);
+}
 function upgrade(k) { rpc('upgrade_building', { p_key: k }, 'Mejora iniciada'); }
 function attackNpc(ri, npcId) { rpc('launch_npc_attack', { p_region: ri, p_npc: npcId }, 'Ataque en marcha'); }
 function attackFort(ri) { rpc('launch_fort_attack', { p_region: ri }, 'Ataque de alianza en marcha'); }
@@ -972,7 +1047,8 @@ async function resolveDue() {
   if (resolving || !S) return;
   const dueMarches = (S.marches || []).some(m => remaining(m.end_at) <= 0);
   const dueBuilds = (S.builds || []).some(b => remaining(b.end_at) <= 0);
-  if (!dueMarches && !dueBuilds) return;
+  const dueTrain = S.train && remaining(S.train.end_at) <= 0;
+  if (!dueMarches && !dueBuilds && !dueTrain) return;
   resolving = true;
   try { if (dueMarches) await sb.rpc('resolve_due_marches'); } catch (_) {}
   resolving = false;

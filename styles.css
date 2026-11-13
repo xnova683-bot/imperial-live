@@ -99,8 +99,10 @@ body.auth main{padding:0;max-width:none;display:grid;place-items:center;min-heig
 .train-row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid rgba(184,203,225,.08)}
 .train-row:last-child{border-bottom:0}
 .train-row.locked{opacity:.55}
-.train-actions{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.train-actions{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
 .train-actions button{min-width:0;padding:6px 7px;font-size:11px}
+.train-qty{width:72px;margin:0;padding:6px 7px;font-size:11px;text-align:center;font-variant-numeric:tabular-nums}
+.train-live{margin:10px 0 4px;padding:9px 10px;background:rgba(46,125,91,.08);border:1px solid rgba(101,200,154,.18);border-radius:9px}
 .army-summary{margin-top:8px;padding-top:8px;border-top:1px solid rgba(184,203,225,.1);font-size:13px}
 
 /* ------------------------- Edificios ------------------------- */
